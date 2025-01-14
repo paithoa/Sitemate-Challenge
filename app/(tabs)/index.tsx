@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -10,6 +10,7 @@ import {
   Alert,
   Image 
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_KEY = '183daca270264bad86fc5b72972fb82a';
 const API_URL = `https://newsapi.org/v2/everything`;
@@ -17,11 +18,42 @@ const API_URL = `https://newsapi.org/v2/everything`;
 export default function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [history, setHistory] = useState([]); 
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      const storedHistory = await AsyncStorage.getItem('searchHistory');
+      if (storedHistory) {
+        setHistory(JSON.parse(storedHistory));
+      }
+    } catch (error) {
+      console.error('Failed to load history', error);
+    }
+  };
+
+  const saveHistory = async (newHistory) => {
+    try {
+      await AsyncStorage.setItem('searchHistory', JSON.stringify(newHistory));
+    } catch (error) {
+      console.error('Failed to save history', error);
+    }
+  };
 
   const searchNews = async () => {
     if (!query.trim()) {
       Alert.alert('Input Error', 'Please enter a news topic to search.');
       return;
+    }
+
+    // Add query to history if it doesn't already exist
+    if (!history.includes(query.trim())) {
+      const newHistory = [query.trim(), ...history];
+      setHistory(newHistory);
+      saveHistory(newHistory);
     }
 
     try {
@@ -48,6 +80,22 @@ export default function App() {
       />
       <Button title="Search" onPress={searchNews} />
 
+      {/* Search History */}
+      <Text style={styles.heading}>Search History</Text>
+      <View style={styles.historyContainer}>
+        <FlatList
+          data={history}
+          keyExtractor={(item, index) => `${item}-${index}`}
+          renderItem={({ item }) => (
+            <TouchableOpacity onPress={() => setQuery(item)}>
+              <Text style={styles.historyItem}>{item}</Text>
+            </TouchableOpacity>
+          )}
+          style={styles.historyList}
+        />
+      </View>
+
+      {/* Search Results */}
       <Text style={styles.heading}>Search Results</Text>
       <FlatList
         data={results}
@@ -85,6 +133,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginVertical: 10,
+  },
+  historyContainer: {
+    height: 100, 
+    marginBottom: 20,
+  },
+  historyList: {
+    flexGrow: 0,
+  },
+  historyItem: {
+    fontSize: 16,
+    paddingVertical: 5,
+    color: '#007BFF',
   },
   resultItem: {
     marginBottom: 10,
