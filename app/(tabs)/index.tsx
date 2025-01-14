@@ -1,3 +1,4 @@
+// filepath: /c:/Users/hhasan/Documents/Sitemate-Challenge/Sitemate-Challenge-Expo/my-app/app/(tabs)/index.tsx
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
@@ -7,10 +8,10 @@ import {
   Text, 
   FlatList, 
   TouchableOpacity, 
-  Alert,
   Image 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomAlert from './CustomAlert';
 
 const API_KEY = '183daca270264bad86fc5b72972fb82a';
 const API_URL = `https://newsapi.org/v2/everything`;
@@ -18,7 +19,10 @@ const API_URL = `https://newsapi.org/v2/everything`;
 export default function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
-  const [history, setHistory] = useState([]); 
+  const [history, setHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false); // Loading state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
 
   useEffect(() => {
     loadHistory();
@@ -43,30 +47,40 @@ export default function App() {
     }
   };
 
+  const showAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
   const searchNews = async () => {
     if (!query.trim()) {
-      Alert.alert('Input Error', 'Please enter a news topic to search.');
+      showAlert('Please enter a news topic to search.');
       return;
     }
 
-    // Add query to history if it doesn't already exist
-    if (!history.includes(query.trim())) {
-      const newHistory = [query.trim(), ...history];
-      setHistory(newHistory);
-      saveHistory(newHistory);
-    }
-
+    setIsLoading(true); // Set loading state to true
+    setResults([]); // Clear previous results
     try {
+      // Add query to history if it doesn't already exist
+      if (!history.includes(query.trim())) {
+        const newHistory = [query.trim(), ...history];
+        setHistory(newHistory);
+        saveHistory(newHistory);
+      }
+
       const response = await fetch(`${API_URL}?q=${query}&apiKey=${API_KEY}`);
       const data = await response.json();
 
-      if (data.articles) {
+      if (response.ok && data.articles.length > 0) {
         setResults(data.articles);
       } else {
-        Alert.alert('Error', 'No results found. Try another search term.');
+        showAlert('No articles found for your search. Try another term.');
       }
     } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      showAlert('Unable to fetch news. Please check your internet connection.');
+      console.error('Network error:', error);
+    } finally {
+      setIsLoading(false); // Set loading state to false
     }
   };
 
@@ -79,6 +93,8 @@ export default function App() {
         onChangeText={setQuery}
       />
       <Button title="Search" onPress={searchNews} />
+
+      {isLoading && <Text style={styles.loading}>Loading...</Text>}
 
       {/* Search History */}
       <Text style={styles.heading}>Search History</Text>
@@ -109,6 +125,16 @@ export default function App() {
             <Text style={styles.description}>{item.description}</Text>
           </View>
         )}
+        ListEmptyComponent={
+          !isLoading && <Text style={styles.noResults}>No results to display</Text>
+        }
+      />
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
       />
     </View>
   );
@@ -129,13 +155,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     backgroundColor: '#fff',
   },
+  loading: {
+    fontSize: 16,
+    fontStyle: 'italic',
+    color: 'gray',
+    marginVertical: 10,
+    textAlign: 'center',
+  },
   heading: {
     fontSize: 18,
     fontWeight: 'bold',
     marginVertical: 10,
   },
   historyContainer: {
-    height: 100, 
+    height: 100,
     marginBottom: 20,
   },
   historyList: {
@@ -170,5 +203,11 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     color: '#555',
+  },
+  noResults: {
+    fontSize: 16,
+    color: 'gray',
+    textAlign: 'center',
+    marginVertical: 20,
   },
 });
